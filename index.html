@@ -42,6 +42,10 @@
       line-height: 1.6;
     }
 
+    body.gate-locked {
+      overflow: hidden;
+    }
+
     a {
       color: inherit;
       text-decoration: none;
@@ -118,6 +122,13 @@
       display: flex;
       align-items: center;
       gap: 10px;
+    }
+
+    .visitor-greeting {
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 0.92rem;
+      white-space: nowrap;
     }
 
     .btn {
@@ -677,6 +688,49 @@
       background: rgba(0, 0, 0, 0.62);
     }
 
+    .access-gate {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 20% 0%, rgba(56, 189, 248, 0.18), transparent 34rem),
+        radial-gradient(circle at 90% 15%, rgba(34, 197, 94, 0.12), transparent 30rem),
+        var(--bg);
+    }
+
+    .access-gate.is-open {
+      display: flex;
+    }
+
+    .access-card {
+      width: min(100%, 560px);
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #0b111d;
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+
+    .access-card h2 {
+      margin-bottom: 10px;
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      line-height: 1.05;
+    }
+
+    .access-card p {
+      color: var(--muted);
+    }
+
+    .access-card form {
+      margin-top: 22px;
+      text-align: left;
+    }
+
     .modal.is-open {
       display: flex;
     }
@@ -739,6 +793,34 @@
       margin-bottom: 18px;
     }
 
+    .admin-subpanel,
+    .class-panel {
+      display: none;
+    }
+
+    .admin-subpanel.is-visible,
+    .class-panel.is-visible {
+      display: block;
+    }
+
+    .class-mode {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 44px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .class-mode input {
+      width: auto;
+      min-height: auto;
+      margin: 0;
+    }
+
     .admin-grid {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 340px;
@@ -776,6 +858,47 @@
       margin-bottom: 12px;
       color: var(--muted);
       font-size: 0.9rem;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      width: max-content;
+      max-width: 100%;
+      margin-bottom: 10px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 900;
+    }
+
+    .status-badge.allowed {
+      background: rgba(34, 197, 94, 0.14);
+      color: #adf7c6;
+    }
+
+    .status-badge.banned {
+      background: rgba(239, 68, 68, 0.16);
+      color: #fecaca;
+    }
+
+    .status-badge.whitelist {
+      background: rgba(245, 158, 11, 0.16);
+      color: #ffe0a3;
+    }
+
+    .admin-feedback {
+      display: none;
+      margin: 0 0 14px;
+      padding: 10px 12px;
+      border: 1px solid rgba(56, 189, 248, 0.32);
+      border-radius: var(--radius);
+      background: rgba(56, 189, 248, 0.1);
+      color: #b9ecff;
+      font-weight: 800;
+    }
+
+    .admin-feedback.is-visible {
+      display: block;
     }
 
     .admin-course-actions {
@@ -941,6 +1064,7 @@
       </nav>
 
       <div class="nav-actions">
+        <span class="visitor-greeting" id="visitorGreeting"></span>
         <button class="btn secondary" type="button" id="openCourseBrowser">Cours</button>
         <button class="btn admin" type="button" id="openAdmin">Admin</button>
       </div>
@@ -1244,6 +1368,26 @@
 
       <div class="admin-panel" id="adminPanel">
         <div class="admin-section">
+          <div class="admin-tools">
+            <button class="btn" type="button" id="showAdminPanel">Admin</button>
+            <button class="btn secondary" type="button" id="toggleClassPanel">Classe</button>
+            <label class="class-mode" for="whitelistMode">
+              <input id="whitelistMode" type="checkbox">
+              Mode whitelist
+            </label>
+          </div>
+
+          <div class="admin-box class-panel" id="classPanel">
+            <h3>Liste des personnes entrees</h3>
+            <p style="color: var(--muted); margin-bottom: 14px;">
+              Le mode whitelist bloque les noms qui ne sont pas marques avec la couronne.
+            </p>
+            <p class="admin-feedback" id="classFeedback"></p>
+            <div class="admin-list" id="classNameList"></div>
+          </div>
+        </div>
+
+        <div class="admin-section admin-subpanel is-visible" id="adminSettingsPanel">
           <div class="admin-grid">
             <div class="admin-box">
               <h3>Parametres du site</h3>
@@ -1436,11 +1580,28 @@
     </div>
   </div>
 
+  <div class="access-gate" id="accessGate" aria-hidden="true">
+    <div class="access-card">
+      <span class="kicker">Acces classe</span>
+      <h2>Quel est ton nom ?</h2>
+      <p>Il n'y a pas de mauvaise reponse. C'est juste pour verifier qui rejoint le site.</p>
+
+      <form id="visitorForm">
+        <label for="visitorName">Ton nom</label>
+        <input id="visitorName" type="text" placeholder="Ex: Prenom Nom" autocomplete="name" required>
+        <p class="admin-error" id="visitorError"></p>
+        <button class="btn" type="submit">Entrer sur le site</button>
+      </form>
+    </div>
+  </div>
+
   <script>
     const ADMIN_CODE = "1410";
     const STORAGE_KEY = "flowlearn_courses";
     const NEWS_STORAGE_KEY = "flowlearn_news";
     const SETTINGS_STORAGE_KEY = "flowlearn_settings";
+    const CLASS_STORAGE_KEY = "flowlearn_class_access";
+    const VISITOR_SESSION_KEY = "flowlearn_current_visitor";
     const SUBJECTS = ["français", "Math", "Histoire", "Géographie", "EMC", "Physique chimie", "SVT", "anglais", "espagnol", "SES"];
     const SUBJECT_MIGRATIONS = {
       Francais: "français",
@@ -1513,6 +1674,13 @@
       footerText: "Plateforme de cours en preparation."
     };
 
+    const defaultClassState = {
+      whitelistMode: false,
+      names: [],
+      banned: [],
+      whitelisted: ["Malo1410"]
+    };
+
     const adminModal = document.querySelector("#adminModal");
     const adminCard = document.querySelector("#adminCard");
     const openAdmin = document.querySelector("#openAdmin");
@@ -1521,6 +1689,18 @@
     const adminCode = document.querySelector("#adminCode");
     const adminError = document.querySelector("#adminError");
     const adminPanel = document.querySelector("#adminPanel");
+    const accessGate = document.querySelector("#accessGate");
+    const visitorForm = document.querySelector("#visitorForm");
+    const visitorName = document.querySelector("#visitorName");
+    const visitorError = document.querySelector("#visitorError");
+    const visitorGreeting = document.querySelector("#visitorGreeting");
+    const showAdminPanel = document.querySelector("#showAdminPanel");
+    const toggleClassPanel = document.querySelector("#toggleClassPanel");
+    const adminSettingsPanel = document.querySelector("#adminSettingsPanel");
+    const classPanel = document.querySelector("#classPanel");
+    const classFeedback = document.querySelector("#classFeedback");
+    const classNameList = document.querySelector("#classNameList");
+    const whitelistMode = document.querySelector("#whitelistMode");
     const settingsForm = document.querySelector("#settingsForm");
     const resetSettings = document.querySelector("#resetSettings");
     const announcementBar = document.querySelector("#announcementBar");
@@ -1613,6 +1793,195 @@
       } catch {
         return { ...defaultSettings };
       }
+    }
+
+    function getClassState() {
+      try {
+        const savedState = localStorage.getItem(CLASS_STORAGE_KEY);
+        const state = { ...defaultClassState, ...(savedState ? JSON.parse(savedState) : {}) };
+
+        if (!isNameWhitelisted("Malo1410", state)) {
+          state.whitelisted.push("Malo1410");
+        }
+
+        return state;
+      } catch {
+        return { ...defaultClassState };
+      }
+    }
+
+    function saveClassState(state) {
+      localStorage.setItem(CLASS_STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function normalizeName(name) {
+      return String(name || "").trim().replace(/\s+/g, " ").toLowerCase();
+    }
+
+    function displayName(name) {
+      return String(name || "").trim().replace(/\s+/g, " ");
+    }
+
+    function isNameBanned(name, state = getClassState()) {
+      const normalizedName = normalizeName(name);
+      return state.banned.some((item) => normalizeName(item) === normalizedName);
+    }
+
+    function isNameWhitelisted(name, state = getClassState()) {
+      const normalizedName = normalizeName(name);
+      return state.whitelisted.some((item) => normalizeName(item) === normalizedName);
+    }
+
+    function canVisitorAccess(name, state = getClassState()) {
+      if (isNameBanned(name, state)) {
+        return { allowed: false, message: "Tu n'as pas acces au site." };
+      }
+
+      if (state.whitelistMode && !isNameWhitelisted(name, state)) {
+        return { allowed: false, message: "Le site est en mode whitelist. Ton nom n'a pas encore acces." };
+      }
+
+      return { allowed: true, message: "" };
+    }
+
+    function rememberVisitor(name) {
+      const state = getClassState();
+      const cleanName = displayName(name);
+      const normalizedName = normalizeName(cleanName);
+      const existingEntry = state.names.find((entry) => normalizeName(entry.name) === normalizedName);
+      const now = new Date().toISOString();
+
+      if (existingEntry) {
+        existingEntry.name = cleanName;
+        existingEntry.lastSeen = now;
+        existingEntry.visits = Number(existingEntry.visits || 0) + 1;
+      } else {
+        state.names.unshift({
+          name: cleanName,
+          firstSeen: now,
+          lastSeen: now,
+          visits: 1
+        });
+      }
+
+      saveClassState(state);
+      renderClassList();
+    }
+
+    function setVisitorGreeting(name) {
+      visitorGreeting.textContent = name ? `Bienvenue ${name}` : "";
+    }
+
+    function openAccessGate(message = "") {
+      document.body.classList.add("gate-locked");
+      accessGate.classList.add("is-open");
+      accessGate.setAttribute("aria-hidden", "false");
+      visitorError.textContent = message;
+      visitorError.classList.toggle("is-visible", Boolean(message));
+      visitorName.focus();
+    }
+
+    function closeAccessGate(name) {
+      document.body.classList.remove("gate-locked");
+      accessGate.classList.remove("is-open");
+      accessGate.setAttribute("aria-hidden", "true");
+      setVisitorGreeting(name);
+    }
+
+    function initVisitorGate() {
+      const currentVisitor = sessionStorage.getItem(VISITOR_SESSION_KEY);
+
+      if (!currentVisitor) {
+        openAccessGate();
+        return;
+      }
+
+      const access = canVisitorAccess(currentVisitor);
+      if (!access.allowed) {
+        sessionStorage.removeItem(VISITOR_SESSION_KEY);
+        openAccessGate(access.message);
+        return;
+      }
+
+      closeAccessGate(currentVisitor);
+    }
+
+    function renderClassList() {
+      const state = getClassState();
+      whitelistMode.checked = Boolean(state.whitelistMode);
+      classNameList.innerHTML = "";
+
+      if (state.names.length === 0) {
+        classNameList.innerHTML = '<div class="empty-courses">Aucun nom enregistre pour le moment.</div>';
+        return;
+      }
+
+      state.names.forEach((entry) => {
+        const isBanned = isNameBanned(entry.name, state);
+        const isWhitelisted = isNameWhitelisted(entry.name, state);
+        const statusClass = isBanned ? "banned" : isWhitelisted ? "whitelist" : "allowed";
+        const statusText = isBanned ? "⛔ Banni" : isWhitelisted ? "👑 Whitelist" : "Autorise";
+        const banButtonClass = isBanned ? "btn danger" : "btn secondary";
+        const whitelistButtonClass = isWhitelisted ? "btn admin" : "btn secondary";
+        const banButtonTitle = isBanned ? "Debannir le nom" : "Bannir le nom";
+        const whitelistButtonTitle = isWhitelisted ? "Retirer de la whitelist" : "Mettre en whitelist";
+        const item = document.createElement("article");
+        item.className = "admin-course";
+        item.innerHTML = `
+          <h3>${escapeHtml(entry.name)}</h3>
+          <span class="status-badge ${statusClass}">${statusText}</span>
+          <p>${Number(entry.visits || 1)} passage${Number(entry.visits || 1) > 1 ? "s" : ""}</p>
+          <div class="admin-course-actions">
+            <button class="${banButtonClass}" type="button" title="${banButtonTitle}" data-ban-name="${escapeHtml(entry.name)}">⛔</button>
+            <button class="${whitelistButtonClass}" type="button" title="${whitelistButtonTitle}" data-whitelist-name="${escapeHtml(entry.name)}">👑</button>
+            <button class="btn secondary" type="button" title="Retirer de la whitelist" data-unwhitelist-name="${escapeHtml(entry.name)}">❌</button>
+          </div>
+        `;
+        classNameList.appendChild(item);
+      });
+    }
+
+    function showClassFeedback(message) {
+      classFeedback.textContent = message;
+      classFeedback.classList.add("is-visible");
+      window.setTimeout(() => {
+        classFeedback.classList.remove("is-visible");
+      }, 2600);
+    }
+
+    function updateClassList(name, action) {
+      const state = getClassState();
+      const cleanName = displayName(name);
+      const normalizedName = normalizeName(cleanName);
+      const wasBanned = isNameBanned(cleanName, state);
+      const wasWhitelisted = isNameWhitelisted(cleanName, state);
+
+      if (action === "ban") {
+        state.banned = state.banned.filter((item) => normalizeName(item) !== normalizedName);
+        if (!wasBanned) {
+          state.whitelisted = state.whitelisted.filter((item) => normalizeName(item) !== normalizedName);
+          state.banned.push(cleanName);
+        }
+      }
+
+      if (action === "whitelist") {
+        state.banned = state.banned.filter((item) => normalizeName(item) !== normalizedName);
+        state.whitelisted = state.whitelisted.filter((item) => normalizeName(item) !== normalizedName);
+        if (!wasWhitelisted) {
+          state.whitelisted.push(cleanName);
+        }
+      }
+
+      if (action === "unwhitelist") {
+        state.whitelisted = state.whitelisted.filter((item) => normalizeName(item) !== normalizedName);
+      }
+
+      saveClassState(state);
+      renderClassList();
+      if (action === "ban") showClassFeedback(wasBanned ? `${cleanName} n'est plus banni.` : `${cleanName} a bien ete banni.`);
+      if (action === "whitelist") showClassFeedback(wasWhitelisted ? `${cleanName} a bien ete retire de la whitelist.` : `${cleanName} a bien ete ajoute a la whitelist.`);
+      if (action === "unwhitelist") showClassFeedback(`${cleanName} a bien ete retire de la whitelist.`);
+      initVisitorGate();
     }
 
     function saveSettings(settings) {
@@ -1884,6 +2253,7 @@
       adminModal.classList.add("is-open");
       adminModal.setAttribute("aria-hidden", "false");
       populateSettingsForm();
+      renderClassList();
       renderAdminCourseList();
       renderAdminNewsList();
 
@@ -2024,6 +2394,69 @@
     openAdmin.addEventListener("click", openAdminModal);
     closeAdmin.addEventListener("click", closeAdminModal);
     openCourseBrowser.addEventListener("click", () => openCourses());
+    showAdminPanel.addEventListener("click", () => {
+      adminSettingsPanel.classList.add("is-visible");
+      classPanel.classList.remove("is-visible");
+    });
+
+    toggleClassPanel.addEventListener("click", () => {
+      adminSettingsPanel.classList.remove("is-visible");
+      classPanel.classList.add("is-visible");
+      renderClassList();
+    });
+
+    whitelistMode.addEventListener("change", () => {
+      const state = getClassState();
+      state.whitelistMode = whitelistMode.checked;
+      const currentVisitor = sessionStorage.getItem(VISITOR_SESSION_KEY);
+
+      if (state.whitelistMode && currentVisitor && !isNameWhitelisted(currentVisitor, state)) {
+        state.whitelisted.push(displayName(currentVisitor));
+      }
+
+      saveClassState(state);
+      renderClassList();
+      initVisitorGate();
+    });
+
+    classNameList.addEventListener("click", (event) => {
+      const banButton = event.target.closest("[data-ban-name]");
+      const whitelistButton = event.target.closest("[data-whitelist-name]");
+      const unwhitelistButton = event.target.closest("[data-unwhitelist-name]");
+
+      if (banButton) {
+        updateClassList(banButton.dataset.banName, "ban");
+      }
+
+      if (whitelistButton) {
+        updateClassList(whitelistButton.dataset.whitelistName, "whitelist");
+      }
+
+      if (unwhitelistButton) {
+        updateClassList(unwhitelistButton.dataset.unwhitelistName, "unwhitelist");
+      }
+    });
+
+    visitorForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      const cleanName = displayName(visitorName.value);
+      if (!cleanName) return;
+
+      rememberVisitor(cleanName);
+      const access = canVisitorAccess(cleanName);
+
+      if (!access.allowed) {
+        visitorError.textContent = access.message;
+        visitorError.classList.add("is-visible");
+        return;
+      }
+
+      sessionStorage.setItem(VISITOR_SESSION_KEY, cleanName);
+      visitorForm.reset();
+      closeAccessGate(cleanName);
+    });
+
     document.querySelectorAll("[data-subject-card]").forEach((card) => {
       card.addEventListener("click", () => openCourses(card.dataset.subjectCard));
     });
@@ -2067,6 +2500,7 @@
         adminPanel.classList.add("is-visible");
         adminError.classList.remove("is-visible");
         populateSettingsForm();
+        renderClassList();
         resetAdminForm();
         resetNewsForm();
         renderAdminCourseList();
@@ -2217,9 +2651,11 @@
     resetNewsForm();
     applySettings();
     populateSettingsForm();
+    renderClassList();
     renderSubjectFilter();
     renderCourses();
     renderNews();
+    initVisitorGate();
   </script>
 </body>
 </html>
